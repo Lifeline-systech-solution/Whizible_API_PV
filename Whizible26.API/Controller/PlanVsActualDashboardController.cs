@@ -29,9 +29,7 @@ namespace Whizible26.API.Controllers
 
         // Added by Vikas T on 28-07-2026 - Populate the five cascading filter dropdowns
         [HttpPost("GetFilterMasters")]
-        [Authorize]
-        [ServiceFilter(typeof(AuthorizeAuditAttribute))]
-        [ServiceFilter(typeof(ValidateHeadersAttribute))]
+       
         public async Task<IActionResult> GetFilterMasters(
             [FromBody] PlanVsActualFilterMastersRequest request)
         {
