@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Portfolio Revenue Mix — Backend Implementation</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; max-width: 920px; margin: 32px auto; color: #1f2937; line-height: 1.5; padding: 0 20px 48px; }
+    h1 { font-size: 26px; border-bottom: 2px solid #1d4ed8; padding-bottom: 8px; }
+    h2 { font-size: 18px; margin-top: 28px; color: #1e3a8a; }
+    h3 { font-size: 15px; margin-top: 18px; }
+    code, pre { font-family: Consolas, "Courier New", monospace; background: #f3f4f6; }
+    pre { padding: 12px 14px; overflow: auto; border-radius: 6px; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #eff6ff; }
+    .note { background: #fffbeb; border-left: 4px solid #d97706; padding: 10px 14px; }
+    .ok { background: #ecfdf5; border-left: 4px solid #059669; padding: 10px 14px; }
+    ul { padding-left: 22px; }
+    .meta { color: #6b7280; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Portfolio Revenue Mix — Backend Implementation Notes</h1>
+  <p class="meta">CXO Analytics Dashboard · API + Stored Procedures only · 15 September 2026<br />
+  API solution: <code>D:\Aditya\API SOLUTIONS\W27 Dashboard API</code></p>
+
+  <h2>1. What was studied before coding</h2>
+  <ol>
+    <li>Page <code>PM_AnalyticsCXO_Dashboard.aspx</code> loads KPI cards through <code>GetAnalyticsDBKPICards</code> using the same date range and chip IDs (Portfolio, Customer, Project Manager, Region, Billing Type, Health).</li>
+    <li>Revenue card Flag maps to stored procedure <code>usp_Whizible2_Sel_AnalyticsDBKPI_Revenue</code>.</li>
+    <li>Revenue drill-through uses <code>POST /api/PM_AnalyticsCXO_Dashboard/GetAnalyticsDBRevenueDrillDown</code> → <code>usp_Whizible2_Sel_AnalyticsDB_RevenueDrillDown</code>.</li>
+    <li>Existing C# pattern: Controller → <code>PM_AnalyticsCXO_Dashboard</code> service → SQL parameters → <code>ResponseHelper.BuildResponse</code>. Drill-down rows are string dictionaries because each level has different columns.</li>
+    <li>No ASPX, JavaScript, chart, or CSS files were changed.</li>
+  </ol>
+
+  <h2>2. How existing Revenue KPI actually calculates Revenue</h2>
+  <p>Source of truth is <code>usp_Whizible2_Sel_AnalyticsDBKPI_Revenue</code>, not a guessed column name.</p>
+  <ul>
+    <li><strong>Fact table:</strong> <code>Tbl_PM_ProjectProfitability</code> (period row keyed by <code>PP.ToDate</code>).</li>
+    <li><strong>Project:</strong> <code>Tbl_PM_Project</code> on <code>ProjectID</code>.</li>
+    <li><strong>Portfolio:</strong> <code>P.ProjectGroupID</code> left-joined to <code>Tbl_PM_ProjectGroup</code> (<code>ProjectGroupName</code>).</li>
+    <li><strong>Health:</strong> <code>INNER JOIN dbo.fn_Whizible2_Get_ProjectOverallHealth(@HealthIDs)</code>.</li>
+    <li><strong>Currency:</strong> company <code>BaseCurrencyID</code>; if project currency differs, <code>tbl_PM_Currency_Detail.ConversionRate</code> for the profitability <code>ToDate</code>.</li>
+  </ul>
+  <pre>RawRevenue =
+  ContractType = 1 (fixed price / milestone):
+      PeriodicMilestoneBilledAmount + PeriodicBillableOtherCostTotal
+  Else (T&amp;M / accrued):
+      PeriodicAccruedResourceBillingTotal + PeriodicBillableOtherCostTotal
+
+ConvertedRevenue = RawRevenue * ExchangeRate
+Current KPI value = SUM(ConvertedRevenue) where PP.ToDate is in CurrentFrom–CurrentTo</pre>
+  <p>The KPI SP also builds previous-period totals and a “growth led by {portfolio}” note. Those are <em>not</em> needed on the mix chart. Mix uses only the <strong>current-period</strong> converted revenue, which is the KPI card’s <code>CurrentValue</code>.</p>
+
+  <h2>3. How dashboard filters are applied on Revenue</h2>
+  <table>
+    <tr><th>API / chip</th><th>KPI SP parameter</th><th>Applied on</th></tr>
+    <tr><td>Current / previous dates</td><td>@CurrentFromDate, @CurrentToDate, @PreviousFromDate, @PreviousToDate</td><td><code>PP.ToDate</code> in current or previous window. Mix uses current window only.</td></tr>
+    <tr><td>Portfolio</td><td>@PortfolioIDs (comma-separated)</td><td><code>P.ProjectGroupID IN (STRING_SPLIT)</code>. Blank = all, including unmapped projects.</td></tr>
+    <tr><td>Customer</td><td>@CustomerIDs</td><td><code>P.CustomerID</code></td></tr>
+    <tr><td>Region</td><td>@RegionIDs</td><td><code>P.LocationID</code></td></tr>
+    <tr><td>Billing Type</td><td>@BillingTypeIDs</td><td><code>P.ContractType</code></td></tr>
+    <tr><td>Health</td><td>@HealthIDs</td><td>Central health TVF</td></tr>
+    <tr><td>Project Manager</td><td>@ProjectManagerIDs</td><td><strong>Declared on the KPI SP but not used in its WHERE clause.</strong> Mix keeps the parameter for signature parity and also does not filter by PM, so mix totals still match the Revenue card.</td></tr>
+    <tr><td>DashboardID / RoleID / UserID</td><td>@DashboardID on SP; Role on KPI request only</td><td>Not used inside the Revenue SP. Mix request still accepts them for the same client payload.</td></tr>
+  </table>
+
+  <h2>4. Existing Revenue drill-down (unchanged)</h2>
+  <ul>
+    <li>Endpoint: <code>GetAnalyticsDBRevenueDrillDown</code></li>
+    <li>SP: <code>usp_Whizible2_Sel_AnalyticsDB_RevenueDrillDown</code></li>
+    <li>Level 1 = all matching portfolios (INNER JOIN Project Group → Project, so empty groups and unmapped projects are omitted).</li>
+    <li>Level 2+ uses <code>@PortfolioID</code> plus the same chip filters. Level 2 already restricts to one group.</li>
+    <li>This endpoint was <strong>not</strong> modified. Mix chart must not call it if a slice click should hide other portfolios at Level 1.</li>
+  </ul>
+
+  <h2>5. What was developed — Portfolio Revenue Mix</h2>
+  <h3>5.1 Stored procedure</h3>
+  <p><code>Scripts\usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMix.sql</code><br />
+  Name: <code>usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMix</code></p>
+  <ul>
+    <li>Copies the KPI BaseData revenue formula, health join, currency join, and the same Customer / Portfolio / Billing / Region filters.</li>
+    <li>Restricts profitability rows to the <strong>current</strong> date range only.</li>
+    <li>Groups by Project Group instead of returning one total.</li>
+    <li>Result columns: <code>PortfolioID</code>, <code>PortfolioName</code>, <code>Revenue</code> (varchar decimal, same AutoMapper-safe style as KPI), <code>RevenueFormatted</code>, <code>BaseCurrencyCode</code>.</li>
+  </ul>
+  <h3>5.2 API</h3>
+  <p><code>POST /api/PM_AnalyticsCXO_Dashboard/GetAnalyticsDBPortfolioRevenueMix</code></p>
+  <p>Request model <code>AnalyticsDBPortfolioRevenueMixRequest</code> — same dates and chip ID lists as <code>GetAnalyticsDBKPICards</code>.</p>
+  <p>Response data is a list of:</p>
+  <pre>{
+  "portfolioID": 1,
+  "portfolioName": "P1",
+  "revenue": 1500000,
+  "revenueFormatted": "S$15.00 L",
+  "baseCurrencyCode": "S$"
+}</pre>
+
+  <h2>6. Empty portfolios vs unmapped projects</h2>
+  <div class="ok">
+    <strong>Case A — Portfolio exists, no projects (or none that pass other filters)</strong><br />
+    If that group is in <code>@PortfolioIDs</code>, the mix SP seeds from <code>Tbl_PM_ProjectGroup</code> and left-joins revenue. The group is still returned with <code>Revenue = 0</code>.
+  </div>
+  <div class="ok" style="margin-top:12px;">
+    <strong>Case B — Project exists, <code>ProjectGroupID</code> is NULL</strong><br />
+    KPI includes those projects only when <code>@PortfolioIDs</code> is blank (the IN-list cannot match NULL). Mix does the same: they appear as <code>PortfolioID = 0</code>, <code>PortfolioName = "Unmapped"</code>. If specific portfolios are selected, unmapped revenue is excluded so SUM(mix) still equals the Revenue KPI.
+  </div>
+  <p>When no portfolio chip is selected, mix returns only groups (plus Unmapped) that have current-period KPI revenue. Empty unused groups are not listed, to avoid filling the donut with zeros.</p>
+
+  <h2>7. Revenue consistency rule</h2>
+  <p>For one filter context:</p>
+  <pre>SUM(mix.Revenue) = GetAnalyticsDBKPICards Flag=Revenue → CurrentValue</pre>
+  <ul>
+    <li>Same formula, same joins, same current dates, same chip filters.</li>
+    <li>@ProjectManagerIDs ignored on both, matching the KPI SP as written.</li>
+    <li>Unmapped included in the sum only when Portfolio chip is empty.</li>
+    <li>Selected empty groups add 0 and do not change the sum.</li>
+  </ul>
+
+  <h2>8. What was developed — Portfolio Revenue Mix drill-down</h2>
+  <h3>8.1 Stored procedure</h3>
+  <p><code>Scripts\usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMixDrillDown.sql</code><br />
+  Name: <code>usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMixDrillDown</code></p>
+  <ul>
+    <li>Clicked <code>@PortfolioID</code> always wins. It overwrites <code>@PortfolioIDs</code> so P2/P3 cannot leak into a P1 click.</li>
+    <li>Level 1 is implemented in this SP: one group only, <code>LEFT JOIN</code> projects so a group with no projects still returns a zero row. Existing Level 1 INNER JOIN would drop that group.</li>
+    <li>Levels 2–6 for a mapped group <code>EXEC</code> the existing <code>usp_Whizible2_Sel_AnalyticsDB_RevenueDrillDown</code> (same invoices → lines → timesheet/milestone/deliverable logic).</li>
+    <li><code>@PortfolioID = 0</code> means Unmapped: every level filters <code>P.ProjectGroupID IS NULL</code>. The old SP’s <code>ProjectGroupID = 0</code> would not match NULL.</li>
+  </ul>
+  <h3>8.2 API</h3>
+  <p><code>POST /api/PM_AnalyticsCXO_Dashboard/GetAnalyticsDBPortfolioRevenueMixDrillDown</code></p>
+  <p>Request: <code>AnalyticsDBPortfolioRevenueMixDrillDownRequest</code></p>
+  <ul>
+    <li>Same dashboard dates and chips as the Revenue drill-down.</li>
+    <li><code>PortfolioID</code> is required. Use <code>0</code> for Unmapped.</li>
+    <li>Level 2 does not require a second id (the slice already is the group). Level 3 still needs <code>ProjectID</code>. Level 4+ still needs <code>InvoiceID</code>.</li>
+    <li><code>InvoiceItemIDs</code> is passed through for Level 5 (existing public Revenue drill request did not send this).</li>
+  </ul>
+  <p>Response reuses <code>AnalyticsDBRevenueDrillDownModel</code>: <code>Level</code>, <code>LevelLabel</code>, <code>Rows</code> (same column names as the existing drill table so the future UI can bind the same way).</p>
+  <pre>Clicked P1 + Customer C1 + Region R1 + Billing T&amp;M + Current Quarter
+        → Level 1: P1 only
+        → Level 2: projects under P1 with those filters
+        → Level 3–6: existing revenue hierarchy, still inside P1</pre>
+
+  <h2>9. Files touched</h2>
+  <table>
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>Whizible26.API\Controller\PM_AnalyticsCXO_DashboardController.cs</code></td><td>Two new POST actions</td></tr>
+    <tr><td><code>Whizible26.Application\CommandsQueries\Dashboard\PM_AnalyticsCXO_Dashboard.cs</code></td><td>Mix + mix drill service methods</td></tr>
+    <tr><td><code>Whizible26.Domain\Entity\DashboardEntities\PM_AnalyticsCXO_DashboardEntity.cs</code></td><td>Request/response models</td></tr>
+    <tr><td><code>Scripts\usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMix.sql</code></td><td>New mix SP</td></tr>
+    <tr><td><code>Scripts\usp_Whizible2_Sel_AnalyticsDB_PortfolioRevenueMixDrillDown.sql</code></td><td>New mix drill SP</td></tr>
+  </table>
+  <p>Deploy step: run both SQL scripts on the application database before calling the new endpoints.</p>
+
+  <h2>10. Suggested frontend contract (not implemented here)</h2>
+  <ol>
+    <li>Donut: call <code>GetAnalyticsDBPortfolioRevenueMix</code> with the same body as <code>buildKpiCardsRequest</code>.</li>
+    <li>Slice click: call <code>GetAnalyticsDBPortfolioRevenueMixDrillDown</code> with that slice’s <code>PortfolioID</code>, keep other chips, start at Level 1 or Level 2.</li>
+    <li>Do not reuse <code>GetAnalyticsDBRevenueDrillDown</code> for the mix chart if Level 1 must be a single slice.</li>
+  </ol>
+
+  <h2>11. Point-wise understanding (summary)</h2>
+  <ol>
+    <li>Portfolio in this product is Project Group (<code>Tbl_PM_ProjectGroup</code> / <code>Tbl_PM_Project.ProjectGroupID</code>).</li>
+    <li>Revenue is profitability-period based, contract-type branched, then converted to base currency.</li>
+    <li>The mix API is the KPI calculation grouped by that Project Group.</li>
+    <li>Selected groups with no work stay in the mix as zero.</li>
+    <li>Unmapped work is a separate bucket named <code>Unmapped</code> (id 0), only when the portfolio chip is not narrowing the set.</li>
+    <li>Mix drill-down is a new API/SP so a slice cannot return sibling portfolios.</li>
+    <li>Deeper drill levels reuse the existing Revenue drill-down SP for mapped groups.</li>
+    <li>Existing Revenue card, existing Revenue drill API, and all frontend files were left as they are.</li>
+  </ol>
+</body>
+</html>

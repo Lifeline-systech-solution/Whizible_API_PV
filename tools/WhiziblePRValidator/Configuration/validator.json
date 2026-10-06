@@ -1,0 +1,6 @@
+{
+  "acceptControllerLevelAttributes": true,
+  "excludeControllers": [],
+  "excludeMethods": [],
+  "probeSystemWeb": true
+}

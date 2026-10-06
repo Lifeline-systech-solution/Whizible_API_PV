@@ -1,0 +1,30 @@
+name: PR validation
+
+on:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Collect changed files
+        shell: pwsh
+        run: |
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" | Out-File -Encoding utf8 changed-files.txt
+          Write-Host "Changed files:"
+          Get-Content changed-files.txt
+
+      - name: Run Whizible PR Validator
+        shell: pwsh
+        run: |
+          dotnet run --project tools/WhiziblePRValidator -c Release -- "${{ github.workspace }}" changed-files.txt

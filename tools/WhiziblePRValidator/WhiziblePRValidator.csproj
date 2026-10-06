@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Whizible.PRValidator</RootNamespace>
+    <AssemblyName>WhiziblePRValidator</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>Whizible pull-request validator for ASPX markup and API controllers.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Configuration\validator.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

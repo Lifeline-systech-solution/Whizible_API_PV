@@ -1,0 +1,6 @@
+@WhizibleTeams.API_HostAddress = http://localhost:5095
+
+GET {{WhizibleTeams.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

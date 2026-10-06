@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper.Data" Version="8.0.0" />
+    <PackageReference Include="ClosedXML" Version="0.95.0" />
+    <PackageReference Include="Dapper" Version="2.1.79" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.2" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="PDFsharp-MigraDoc" Version="1.50.5147" />
+    <PackageReference Include="QuestPDF" Version="2025.12.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Whizible26.Domain\Whizible26.Domain.csproj" />
+    <ProjectReference Include="..\Whizible26.Infra\Whizible26.Infra.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Whiz.CommonFunctions">
+      <HintPath>bin\Whiz.CommonFunctions.dll</HintPath>
+    </Reference>
+    <Reference Include="Whiz.Security">
+      <HintPath>bin\Whiz.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="WhizibleGeneralFunction">
+		<!--<HintPath>bin\WhizibleGeneralFunction.dll</HintPath>-->
+		<HintPath>bin\Debug\net8.0\WhizibleGeneralFunction.dll</HintPath>
+
+		
+	</Reference>
+  </ItemGroup>
+
+</Project>
