@@ -33,8 +33,8 @@ namespace Whizible26.API.Controllers
 
         // Added by Vyankat B. on 11-08-2026 - usp_Whizible2_Sel_FinancialType
         [HttpPost("GetFinancialType")]
-        [Authorize]
-        [ServiceFilter(typeof(AuthorizeAuditAttribute))]
+        //[Authorize]
+        //[ServiceFilter(typeof(AuthorizeAuditAttribute))]
         public async Task<IActionResult> GetFinancialType()
         {
             try
